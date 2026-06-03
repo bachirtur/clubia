@@ -70,19 +70,19 @@ faq:[{q:"Gemini peut-il se tromper ?",a:"Oui ! Toujours vérifier les informatio
 };
 
 /* ═══ ÉTAT ═══ */
-var S={v:'home',m:null,tb:'pres',nm:'',th:'light',pr:{},bdg:[],qs:{}};
+var S={v:'home',m:null,tb:'pres',uname:'',th:'light',pr:{},bdg:[],qs:{}};
 
 function dp(){var p={};for(var i=1;i<=5;i++)p[i]={sd:[],qs:null,qa:{},xd:[],pd:false};p.fp={d:false,st:[]};return p}
 
 function ld(){
-  try{var s=JSON.parse(localStorage.getItem('cia'));if(s)S={v:s.v||'home',m:s.m||null,tb:s.tb||'pres',nm:s.nm||'',th:s.th||'light',pr:s.pr||dp(),bdg:s.bdg||[],qs:{}}}catch(e){}
+  try{var s=JSON.parse(localStorage.getItem('cia'));if(s){S.v=s.v||'home';S.m=s.m||null;S.tb=s.tb||'pres';S.uname=s.uname||'';S.th=s.th||'light';S.pr=s.pr||dp();S.bdg=s.bdg||[];S.qs={}}}catch(e){}
   if(!S.pr||!S.pr[1])S.pr=dp();
   ath(S.th);
-  var ni=document.getElementById('nameInp');if(ni)ni.value=S.nm||'';
+  var ni=document.getElementById('nameInp');if(ni)ni.value=S.uname||'';
 }
 
 function sv(){
-  try{localStorage.setItem('cia',JSON.stringify({v:S.v,m:S.m,tb:S.tb,nm:S.nm,th:S.th,pr:S.pr,bdg:S.bdg}))}catch(e){}
+  try{localStorage.setItem('cia',JSON.stringify({v:S.v,m:S.m,tb:S.tb,uname:S.uname,th:S.th,pr:S.pr,bdg:S.bdg}))}catch(e){}
 }
 
 /* ═══ HELPERS ═══ */
@@ -99,8 +99,11 @@ function mp(i){
 }
 
 function ap(){var t=0;for(var i=1;i<=5;i++)t+=mp(i);return Math.round(t/5)}
-function bq(){var b=0;for(var i=1;i<=5;i++){var s=S.pr[i]?S.pr[i].qs:null;if(s>b)b=s}return b}
-function nm(){for(var i=1;i<=5;i++)if(mp(i)<100)return i;return 1}
+function bq(){var b=0;for(var i=1;i<=5;i++){var s=S.pr[i]?S.pr[i].qs:null;if(s!==null&&s>b)b=s}return b}
+
+/* BUG CORRIGÉ : cette fonction s'appelait nm() et était écrasée
+   par la variable locale var nm=... dans rh() */
+function nxtMod(){for(var i=1;i<=5;i++)if(mp(i)<100)return i;return 1}
 
 function ms(mi,sec){
   if(!S.pr[mi])S.pr[mi]={sd:[],qs:null,qa:{},xd:[],pd:false};
@@ -117,7 +120,7 @@ function tst(msg,tp){
   var ic=tp==='ok'?'check-circle':tp==='er'?'times-circle':'info-circle';
   d.innerHTML='<i class="fa-solid fa-'+ic+'"></i>'+msg;
   c.appendChild(d);
-  setTimeout(function(){d.remove()},3500);
+  setTimeout(function(){if(d.parentNode)d.parentNode.removeChild(d)},3500);
 }
 
 function cft(){
@@ -129,7 +132,7 @@ function cft(){
     d.style.animationDelay=Math.random()*2+'s';
     d.style.borderRadius=Math.random()>.5?'50%':'0';
     document.body.appendChild(d);
-    setTimeout(function(el){el.remove()},4000,d);
+    setTimeout(function(el){return function(){if(el.parentNode)el.parentNode.removeChild(el)}}(d),4000);
   }
 }
 
@@ -137,8 +140,13 @@ function smhtml(h){document.getElementById('modalC').innerHTML=h;document.getEle
 function cm(){document.getElementById('modalOv').classList.remove('show')}
 
 /* ═══ NAVIGATION ═══ */
+/* BUG CORRIGÉ : les appels go() pour les pages sans module
+   passaient m='' au lieu de null, ce qui corrompait S.m */
 function go(v,m,tb){
-  S.v=v;if(m!=null&&m!==undefined)S.m=m;if(tb)S.tb=tb;S.qs={};sv();ren();csb();window.scrollTo(0,0);
+  S.v=v;
+  if(v==='mod'&&m!=null&&m!==undefined&&m!==''){S.m=m}
+  if(tb&&tb!==''){S.tb=tb}else{S.tb='pres'}
+  S.qs={};sv();ren();csb();window.scrollTo(0,0);
 }
 
 function ren(){rsb();rc();ut();ckb();uc()}
@@ -163,7 +171,15 @@ function rsb(){
     var dot=it.c?'<span class="ndot" style="background:'+it.c+'"></span>':'';
     var pr='';
     if(it.mi)pr='<span class="nprog">'+mp(it.mi)+'%</span>';
-    h+='<div class="ni'+(act?' act':'')+'" onclick="go(\''+it.v+'\''+(it.mi?','+it.mi:'')+',\''+(it.mi?'pres':'')+'\')">'+dot+'<i class="'+it.i+' ic"></i><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+it.l+'</span>'+pr+'</div>';
+    /* BUG CORRIGÉ : les items sans module utilisaient go('home','') 
+       qui passait une chaîne vide comme module */
+    var oc="";
+    if(it.mi){
+      oc="go('mod',"+it.mi+",'pres')";
+    }else{
+      oc="go('"+it.v+"')";
+    }
+    h+='<div class="ni'+(act?' act':'')+'" onclick="'+oc+'">'+dot+'<i class="'+it.i+' ic"></i><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+it.l+'</span>'+pr+'</div>';
   }
   n.innerHTML=h;
 }
@@ -179,20 +195,27 @@ function csb(){document.getElementById('sidebar').classList.remove('open')}
 /* ═══ RENDU CONTENU ═══ */
 function rc(){
   var el=document.getElementById('content');
-  switch(S.v){
-    case'home':el.innerHTML=rh();break;
-    case'mod':el.innerHTML=rm();break;
-    case'fp':el.innerHTML=rf();break;
-    case'res':el.innerHTML=rr();break;
-    case'bdg':el.innerHTML=rb();break;
-    default:el.innerHTML=rh();
+  try{
+    switch(S.v){
+      case'home':el.innerHTML=rh();break;
+      case'mod':el.innerHTML=rm();break;
+      case'fp':el.innerHTML=rf();break;
+      case'res':el.innerHTML=rr();break;
+      case'bdg':el.innerHTML=rb();break;
+      default:el.innerHTML=rh();
+    }
+  }catch(e){
+    el.innerHTML='<div style="padding:20px"><h3>Erreur</h3><p style="color:red">'+e.message+'</p><pre style="font-size:11px;color:#666;overflow:auto">'+e.stack+'</pre></div>';
+    console.error(e);
   }
-  setTimeout(function(){ia();iq()},50);
+  setTimeout(function(){ia()},50);
 }
 
 /* ═══ ACCUEIL ═══ */
 function rh(){
-  var nm=S.nm||'jeune explorateur';
+  /* BUG CORRIGÉ : la variable s'appelait nm, ce qui écrasait
+     la fonction nm() (maintenant renommée nxtMod()) */
+  var userName=S.uname||'jeune explorateur';
   var tp=ap();
   var cm=0;for(var i=1;i<=5;i++)if(mp(i)===100)cm++;
   var te=0,ce=0;for(var i=0;i<5;i++){te+=M[i].exos.deb.length+M[i].exos.int.length+M[i].exos.adv.length;ce+=(S.pr[i+1]&&S.pr[i+1].xd)?S.pr[i+1].xd.length:0;}
@@ -201,11 +224,11 @@ function rh(){
   h+='<div style="position:absolute;top:-40px;right:-40px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.08)"></div>';
   h+='<div style="position:relative;z-index:1">';
   h+='<p style="font-size:12px;opacity:.85;font-weight:500;margin-bottom:4px">Club Intelligence Artificielle</p>';
-  h+='<h2 style="font-size:26px;font-weight:900;margin-bottom:8px;font-family:var(--fd)">Bienvenue, '+nm+' !</h2>';
+  h+='<h2 style="font-size:26px;font-weight:900;margin-bottom:8px;font-family:var(--fd)">Bienvenue, '+userName+' !</h2>';
   h+='<p style="font-size:14px;opacity:.9;max-width:460px;margin-bottom:16px">Découvre les outils Gemini de Google et deviens un expert de l\'IA.</p>';
   h+='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
   h+='<div style="background:rgba(255,255,255,.2);border-radius:var(--rds);padding:5px 12px;backdrop-filter:blur(10px)"><span style="font-weight:800;font-size:16px">'+tp+'%</span><span style="font-size:11px;opacity:.85;margin-left:4px">progression</span></div>';
-  h+='<button class="btn" style="background:rgba(255,255,255,.2);color:#fff;backdrop-filter:blur(10px)" onclick="go(\'mod\','+nm()+',\'pres\')">'+(tp===0?'Commencer le parcours':'Continuer')+' <i class="fa-solid fa-arrow-right"></i></button>';
+  h+='<button class="btn" style="background:rgba(255,255,255,.2);color:#fff;backdrop-filter:blur(10px)" onclick="go(\'mod\','+nxtMod()+',\'pres\')">'+(tp===0?'Commencer le parcours':'Continuer')+' <i class="fa-solid fa-arrow-right"></i></button>';
   h+='</div></div></div>';
 
   h+='<div class="g2" style="margin-bottom:24px">';
@@ -241,7 +264,8 @@ function rh(){
 
 /* ═══ MODULE ═══ */
 function rm(){
-  var m=M[S.m-1];if(!m)return '<p>Module introuvable</p>';
+  if(!S.m||S.m<1||S.m>5)return '<p style="padding:20px">Module introuvable. <a href="#" onclick="go(\'home\');return false">Retour à l\'accueil</a></p>';
+  var m=M[S.m-1];
   var tbs=['Présentation','Découverte','Tutoriels','Exercices','Quiz','Mini-projet'];
   var ks=['pres','disc','tutos','exos','quiz','proj'];
   var ct='';
@@ -368,7 +392,17 @@ function rq(m){
   return h;
 }
 
-function sa(qi,oi){S.qs[qi]=oi;var opts=document.querySelectorAll('.qq');if(opts[qi]){var os=opts[qi].querySelectorAll('.qo');for(var i=0;i<os.length;i++){os[i].classList.remove('sel');if(i===oi)os[i].classList.add('sel')}}}
+function sa(qi,oi){
+  S.qs[qi]=oi;
+  var opts=document.querySelectorAll('.qq');
+  if(opts[qi]){
+    var os=opts[qi].querySelectorAll('.qo');
+    for(var i=0;i<os.length;i++){
+      os[i].classList.remove('sel');
+      if(i===oi)os[i].classList.add('sel');
+    }
+  }
+}
 
 function sq(mi){
   var m=M[mi-1];var sc=0;var ans={};
@@ -523,7 +557,7 @@ function rb(){
 
 /* ═══ CERTIFICAT ═══ */
 function gc(){
-  var name=S.nm||'Élève';
+  var name=S.uname||'Élève';
   var d=new Date();var date=d.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
   var c=document.createElement('canvas');c.width=1000;c.height=700;
   var x=c.getContext('2d');
@@ -546,14 +580,15 @@ function gc(){
   x.fillStyle='#475569';x.font='13px DM Sans, sans-serif';
   for(var i=0;i<5;i++){x.fillText('Module '+(i+1)+' — '+M[i].t+(mp(i+1)===100?' ✓':''),500,495+i*18)}
   x.fillStyle='#0D9488';x.font='bold 16px DM Sans, sans-serif';x.fillText('Délivré le '+date,500,610);
-  smhtml('<div style="text-align:center"><h3 style="margin-bottom:14px">Ton Certificat</h3><img src="'+c.toDataURL()+'" style="max-width:100%;border-radius:var(--rds);box-shadow:var(--shl)"><div style="margin-top:14px;display:flex;gap:8px;justify-content:center"><a href="'+c.toDataURL()+'" download="certificat-club-ia.png" class="btn btn-p"><i class="fa-solid fa-download"></i> Télécharger</a><button class="btn btn-o" onclick="cm()">Fermer</button></div></div>');
+  var imgData=c.toDataURL('image/png');
+  smhtml('<div style="text-align:center"><h3 style="margin-bottom:14px">Ton Certificat</h3><img src="'+imgData+'" style="max-width:100%;border-radius:var(--rds);box-shadow:var(--shl)"><div style="margin-top:14px;display:flex;gap:8px;justify-content:center"><a href="'+imgData+'" download="certificat-club-ia.png" class="btn btn-p"><i class="fa-solid fa-download"></i> Télécharger</a><button class="btn btn-o" onclick="cm()">Fermer</button></div></div>');
 }
 
 /* ═══ BADGES CHECK ═══ */
 function ckb(){
   var b=S.bdg;
   if(b.indexOf('first')<0){for(var i=1;i<=5;i++){if(S.pr[i]&&S.pr[i].sd&&S.pr[i].sd.length>0){b.push('first');tst('Badge : Premiers pas !','ok');break}}}
-  for(var i=1;i<=5;i++){if(mp(i)===100&&b.indexOf('m'+i)<0){b.push('m'+i);var bn=BD.filter(function(x){return x.id==='m'+i})[0];tst('Badge : '+(bn?bn.n:'')+' !','ok');cft()}}
+  for(var i=1;i<=5;i++){if(mp(i)===100&&b.indexOf('m'+i)<0){b.push('m'+i);var bn=null;for(var j=0;j<BD.length;j++){if(BD[j].id==='m'+i){bn=BD[j];break}}tst('Badge : '+(bn?bn.n:'')+' !','ok');cft()}}
   if(b.indexOf('q10')<0){for(var i=1;i<=5;i++){if(S.pr[i]&&S.pr[i].qs===10){b.push('q10');tst('Badge : Quiz Champion !','ok');cft();break}}}
   if(b.indexOf('exs')<0){for(var i=1;i<=5;i++){var m=M[i-1];var tot=m.exos.deb.length+m.exos.int.length+m.exos.adv.length;if(S.pr[i]&&S.pr[i].xd&&S.pr[i].xd.length>=tot){b.push('exs');tst('Badge : Exercise Star !','ok');break}}}
   if(S.pr.fp&&S.pr.fp.d&&b.indexOf('ph')<0){b.push('ph');tst('Badge : Project Hero !','ok');cft()}
@@ -572,15 +607,30 @@ function ia(){
     }
   }
 }
-function iq(){}
 
 /* ═══ INIT ═══ */
 document.addEventListener('DOMContentLoaded',function(){
   ld();
-  document.getElementById('menuBtn').addEventListener('click',function(){document.getElementById('sidebar').classList.toggle('open')});
-  document.getElementById('themeTog').addEventListener('click',function(){ath(S.th==='light'?'dark':'light')});
-  document.getElementById('nameInp').addEventListener('input',function(e){S.nm=e.target.value.trim();sv()});
+
+  /* Effacer l'ancien état corrompu si nécessaire */
+  try{
+    var old=JSON.parse(localStorage.getItem('cia'));
+    if(old&&old.nm!==undefined){delete old.nm;old.uname=old.uname||'';localStorage.setItem('cia',JSON.stringify(old))}
+  }catch(e){}
+
+  document.getElementById('menuBtn').addEventListener('click',function(){
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+  document.getElementById('themeTog').addEventListener('click',function(){
+    ath(S.th==='light'?'dark':'light');
+  });
+  document.getElementById('nameInp').addEventListener('input',function(e){
+    S.uname=e.target.value.trim();sv();
+  });
   document.getElementById('certBtn').addEventListener('click',gc);
-  document.getElementById('modalOv').addEventListener('click',function(e){if(e.target===document.getElementById('modalOv'))cm()});
+  document.getElementById('modalOv').addEventListener('click',function(e){
+    if(e.target===document.getElementById('modalOv'))cm();
+  });
+
   ren();
 });
